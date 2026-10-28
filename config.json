@@ -1,0 +1,402 @@
+{
+  "manual_points": {
+    "enabled": true,
+    "school_unid": "8004",
+    "coordinate_system": "gcj02",
+    "route_points": [
+      {
+        "latitude": 40.142725,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142728,
+        "longitude": 116.236892,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142731,
+        "longitude": 116.236998,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142734,
+        "longitude": 116.237104,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142735,
+        "longitude": 116.237217,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142735,
+        "longitude": 116.237337,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142735,
+        "longitude": 116.237457,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142735,
+        "longitude": 116.237577,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142737,
+        "longitude": 116.237697,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142738,
+        "longitude": 116.237817,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142739,
+        "longitude": 116.237938,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142741,
+        "longitude": 116.238058,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142739,
+        "longitude": 116.238176,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142738,
+        "longitude": 116.238294,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142736,
+        "longitude": 116.238412,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142716,
+        "longitude": 116.238526,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142677,
+        "longitude": 116.238636,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142631,
+        "longitude": 116.238724,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142584,
+        "longitude": 116.238812,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142532,
+        "longitude": 116.238899,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142473,
+        "longitude": 116.238985,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142415,
+        "longitude": 116.239068,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142356,
+        "longitude": 116.239148,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142296,
+        "longitude": 116.239228,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142222,
+        "longitude": 116.239287,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142148,
+        "longitude": 116.239346,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142074,
+        "longitude": 116.239405,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141996,
+        "longitude": 116.23946,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141913,
+        "longitude": 116.239513,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141831,
+        "longitude": 116.239565,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141759,
+        "longitude": 116.239598,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141687,
+        "longitude": 116.239631,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141605,
+        "longitude": 116.239648,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141514,
+        "longitude": 116.23965,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141423,
+        "longitude": 116.239652,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141332,
+        "longitude": 116.239653,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141286,
+        "longitude": 116.239596,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141286,
+        "longitude": 116.239479,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141286,
+        "longitude": 116.239362,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141298,
+        "longitude": 116.239258,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141323,
+        "longitude": 116.239166,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141386,
+        "longitude": 116.239094,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.14145,
+        "longitude": 116.239021,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141455,
+        "longitude": 116.238911,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141461,
+        "longitude": 116.238801,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141466,
+        "longitude": 116.238691,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141471,
+        "longitude": 116.23857,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141476,
+        "longitude": 116.238448,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141482,
+        "longitude": 116.238327,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141486,
+        "longitude": 116.23821,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.14149,
+        "longitude": 116.238093,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141494,
+        "longitude": 116.237976,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141498,
+        "longitude": 116.237859,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141499,
+        "longitude": 116.237747,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.1415,
+        "longitude": 116.237636,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141501,
+        "longitude": 116.237524,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141502,
+        "longitude": 116.237412,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141505,
+        "longitude": 116.237303,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141508,
+        "longitude": 116.237195,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141512,
+        "longitude": 116.237087,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141535,
+        "longitude": 116.23699,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141577,
+        "longitude": 116.236902,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141659,
+        "longitude": 116.236847,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141741,
+        "longitude": 116.236792,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141832,
+        "longitude": 116.23679,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.141922,
+        "longitude": 116.236788,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142013,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142106,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142201,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142296,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142392,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142487,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142582,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      },
+      {
+        "latitude": 40.142677,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      }
+    ],
+    "checkin_points": [
+      {
+        "latitude": 40.142725,
+        "longitude": 116.236786,
+        "accuracy": 0.0
+      }
+    ]
+  },
+  "school_campus": null,
+  "username": "15611106181",
+  "password": "",
+  "remember": false,
+  "dist_min": 6.0,
+  "dist_max": 7.0,
+  "pace_min": 360.0,
+  "pace_max": 480.0,
+  "face_check": true,
+  "manual_altitude": null,
+  "manual_altitude_range": null,
+  "ai_minutes": 1,
+  "ai_reps": 5,
+  "update_check": "silent",
+  "osm_path": "",
+  "route_mode": "legacy"
+}

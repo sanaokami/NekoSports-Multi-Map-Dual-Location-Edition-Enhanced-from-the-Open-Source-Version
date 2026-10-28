@@ -1,0 +1,1187 @@
+diff --git a/src/api/flow.rs b/src/api/flow.rs
+index 9dfaf7f..42f9c37 100644
+--- a/src/api/flow.rs
++++ b/src/api/flow.rs
+@@ -138,14 +138,21 @@ pub fn run_full_flow_cancellable(
+         fences
+     };
+ 
+-    // ② 实时点位（拒绝本地样本兜底）
+-    log("[points] 拉取实时点位…");
+-    if client.identity.has_unconfigured_default_location() {
++    // ② Explicit manual points or current server points.
++    let manual = super::model::load_config().manual_points;
++    log(if manual.enabled {
++        "[points] 读取手动点位…"
++    } else {
++        "[points] 拉取实时点位…"
++    });
++    if !manual.enabled && client.identity.has_unconfigured_default_location() {
+         return Err("请先在设备信息页填写本次跑步所在城市和定位锚点，不能使用大连默认配置".into());
+     }
+-    let anchor: Coordinate = client.identity.anchor_coordinate()?;
++    let anchor: Coordinate =
++        super::manual_points::effective_anchor(&client.identity, &sess.unid, &manual)?;
+     let area_id = (fences.area.run_area_id >= 0).then(|| fences.area.run_area_id.to_string());
+-    let pts = points::fetch_points_ext(client, anchor, area_id, log)?;
++    let data = points::fetch_run_data(client, anchor, area_id, &pol.must_points, &manual, log)?;
++    let pts = data.checkin_points;
+     if pts.is_empty() {
+         return Err("实时点位为空 —— 拒绝本地样本兜底".into());
+     }
+@@ -161,13 +168,13 @@ pub fn run_full_flow_cancellable(
+         ));
+     }
+ 
+-    // ③ 轨迹生成（必经点 + 打卡点）
++    // ③ 轨迹生成：手动模式仅使用定位点；服务器模式沿用策略与实时点位。
+     if points::points_bd(&pts).len() != pts.len() {
+         return Err("实时点位包含无效坐标".into());
+     }
+-    let route_pts = points::route_points(&pol.must_points, &pts);
++    let route_pts = data.route_points;
+     log(&format!(
+-        "[points] 去重后 {} 个路线点位（包含全部策略必经点）",
++        "[points] {} 个路线定位点（与打卡点分开）",
+         route_pts.len()
+     ));
+     // Keep the user's location stable so preview and submission refer to the same campus.
+diff --git a/src/api/mod.rs b/src/api/mod.rs
+index 06d914e..8084d49 100644
+--- a/src/api/mod.rs
++++ b/src/api/mod.rs
+@@ -10,6 +10,7 @@ pub mod gt4;
+ pub mod gt4image;
+ pub mod login;
+ pub mod model;
++pub mod manual_points;
+ pub mod obs;
+ pub mod points;
+ pub mod policy;
+diff --git a/src/api/model.rs b/src/api/model.rs
+index d43eabe..d479a72 100644
+--- a/src/api/model.rs
++++ b/src/api/model.rs
+@@ -45,6 +45,9 @@ impl Session {
+ /// UI 参数（config.json）。
+ #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+ pub struct Config {
++    /// Explicit local route points; kept separate from server point caches.
++    #[serde(default)]
++    pub manual_points: super::manual_points::Settings,
+     #[serde(default)]
+     pub school_campus: Option<super::campus::Selection>,
+     #[serde(default)]
+@@ -110,6 +113,7 @@ fn default_update_check() -> String {
+ impl Default for Config {
+     fn default() -> Self {
+         Self {
++            manual_points: Default::default(),
+             school_campus: None,
+             username: String::new(),
+             password: String::new(),
+diff --git a/src/api/points.rs b/src/api/points.rs
+index 342e34a..e45f845 100644
+--- a/src/api/points.rs
++++ b/src/api/points.rs
+@@ -10,6 +10,42 @@ use crate::crypto::sign::md5_url_sign;
+ use crate::location::Coordinate;
+ use serde_json::{json, Value};
+ 
++/// Separate route geometry from the locations included in check-in metadata.
++pub struct RunData {
++    pub route_points: Vec<(f64, f64)>,
++    pub checkin_points: Vec<Value>,
++}
++
++pub fn fetch_run_data(
++    client: &mut ApiClient,
++    anchor: Coordinate,
++    area: Option<String>,
++    required: &[(f64, f64)],
++    manual: &super::manual_points::Settings,
++    log: &mut dyn FnMut(&str),
++) -> Result<RunData, String> {
++    if manual.enabled {
++        let school = &client.login.as_ref().ok_or("请先登录")?.unid;
++        let route_points = manual.route_bd(school)?;
++        let checkin_points = manual.payload(school)?;
++        log(&format!(
++            "[points] 手动定位点 {} 个；独立打卡点 {} 个",
++            route_points.len(),
++            checkin_points.len()
++        ));
++        return Ok(RunData {
++            route_points,
++            checkin_points,
++        });
++    }
++    let checkin_points = fetch_points_ext(client, anchor, area, log)?;
++    let route_points = route_points(required, &checkin_points);
++    Ok(RunData {
++        route_points,
++        checkin_points,
++    })
++}
++
+ pub const POINTS_PATH: &str = "/api/v560/get/1/distance/1";
+ 
+ /// 经纬度六位小数字符串。
+@@ -35,6 +71,15 @@ pub fn fetch_points_ext(
+ ) -> Result<Vec<Value>, String> {
+     anchor.validate()?;
+     let login = client.login.as_ref().ok_or("请先登录后获取点位")?;
++    let manual = model::load_config().manual_points;
++    if manual.enabled {
++        let points = manual.payload(&login.unid)?;
++        log(&format!(
++            "[points] 使用已保存的 {} 个手动点位（本地设置）",
++            points.len()
++        ));
++        return Ok(points);
++    }
+     let scope = model::PointsCacheScope {
+         uid: login.uid,
+         unid: login.unid.clone(),
+@@ -93,6 +138,9 @@ pub fn fetch_points_ext(
+ }
+ 
+ pub(crate) fn parse_points(payload: &Value) -> Result<Vec<Value>, String> {
++    if payload.get("error").and_then(Value::as_i64) == Some(10600) {
++        return Err("学校未设置服务器点位（10600）。可在跑步页展开“手动点位设置”，填写坐标并保存启用；学校要求官方打卡点时请联系老师确认".into());
++    }
+     let payload = super::client::check_business(payload)?;
+     // pointsResModels：优先顶层，其次 data 子对象
+     let pts: Vec<Value> = super::client::get_field(&payload, "pointsResModels")
+diff --git a/src/cli/cmds.rs b/src/cli/cmds.rs
+index 954f7b9..5560bbe 100644
+--- a/src/cli/cmds.rs
++++ b/src/cli/cmds.rs
+@@ -456,21 +456,27 @@ fn cmd_obs_sample(rest: &[&str]) -> i32 {
+         }
+     };
+     let mut log = |s: &str| eprintln!("{s}");
+-    let anchor = match client.identity.anchor_coordinate() {
+-        Ok(value) => value,
+-        Err(e) => {
+-            eprintln!("定位锚点无效: {e}");
+-            return 1;
+-        }
+-    };
+-    let pts = match crate::api::points::fetch_points(&mut client, anchor, &mut log) {
+-        Ok(p) => p,
+-        Err(e) => {
+-            eprintln!("点位拉取失败: {e}");
+-            return 1;
+-        }
+-    };
+-    let pts_bd = crate::api::points::points_bd(&pts);
++    let manual = crate::api::model::load_config().manual_points;
++    let school = client.login.as_ref().map(|s| s.unid.as_str()).unwrap_or("");
++    let anchor =
++        match crate::api::manual_points::effective_anchor(&client.identity, school, &manual) {
++            Ok(value) => value,
++            Err(e) => {
++                eprintln!("定位点无效: {e}");
++                return 1;
++            }
++        };
++    let data =
++        match crate::api::points::fetch_run_data(&mut client, anchor, None, &[], &manual, &mut log)
++        {
++            Ok(data) => data,
++            Err(e) => {
++                eprintln!("点位读取失败: {e}");
++                return 1;
++            }
++        };
++    let pts = data.checkin_points;
++    let pts_bd = data.route_points;
+     let start_ms = crate::crypto::envelope::now_ms() - dur * 1000;
+     let track = crate::track::generator::build(
+         dist,
+diff --git a/src/ui/jobs.rs b/src/ui/jobs.rs
+index 91cb71d..250bb11 100644
+--- a/src/ui/jobs.rs
++++ b/src/ui/jobs.rs
+@@ -109,8 +109,11 @@ impl App {
+         let request_id = self.begin_network_load();
+         self.network = manual_network.clone();
+         let identity = self.identity.clone();
+-        let anchor = identity.anchor_coordinate().ok();
+-        let preview_anchor = anchor.filter(|_| !identity.has_unconfigured_default_location());
++        let manual = self.config.manual_points.clone();
++        let anchor =
++            crate::api::manual_points::effective_anchor(&identity, &session.unid, &manual).ok();
++        let preview_anchor =
++            anchor.filter(|_| manual.enabled || !identity.has_unconfigured_default_location());
+         let scope = Some((
+             session.uid,
+             session.unid.clone(),
+@@ -220,16 +223,16 @@ impl App {
+                 stage("获取当前学校策略与路线点位…");
+                 let policy = crate::api::policy::fetch_policy(&mut client)?;
+                 control.check()?;
+-                let pts = crate::api::points::fetch_points_ext(
++                let data = crate::api::points::fetch_run_data(
+                     &mut client,
+                     anchor,
+                     run_area_id,
++                    &policy.must_points,
++                    &manual,
+                     &mut log,
+                 )?;
+-                if pts.is_empty() || crate::api::points::points_bd(&pts).len() != pts.len() {
+-                    return Err("点位为空或坐标无效".into());
+-                }
+-                let route_points = crate::api::points::route_points(&policy.must_points, &pts);
++                let route_points = data.route_points;
++                let checkin_points = crate::api::points::points_bd(&data.checkin_points);
+                 if loaded.is_none() {
+                     stage("按学校真实点位获取附近路网…");
+                     loaded = Some(std::sync::Arc::new(
+@@ -250,6 +253,7 @@ impl App {
+                     unid: session.unid.clone(),
+                     anchor,
+                     points: route_points,
++                    checkin_points,
+                     fences: fences.clone(),
+                     loaded_ms: crate::crypto::envelope::now_ms(),
+                 });
+@@ -576,7 +580,9 @@ impl App {
+ 
+     /// 学期 + 违规自查（登录 / 跑步提交成功后自动调用）。
+     pub fn refresh_data_page(&mut self) {
+-        if self.data_page.cheat_checking { return; }
++        if self.data_page.cheat_checking {
++            return;
++        }
+         let Some(session) = self.session.clone() else {
+             self.status = "请先登录".into();
+             return;
+@@ -629,7 +635,9 @@ impl App {
+     }
+ 
+     pub fn refresh_cheat_only(&mut self) {
+-        if self.data_page.cheat_checking { return; }
++        if self.data_page.cheat_checking {
++            return;
++        }
+         let Some(session) = self.session.clone() else {
+             self.status = "请先登录".into();
+             return;
+diff --git a/src/ui/mod.rs b/src/ui/mod.rs
+index c52836c..555bcda 100644
+--- a/src/ui/mod.rs
++++ b/src/ui/mod.rs
+@@ -433,6 +433,9 @@ impl App {
+                 days_ago: 0,
+                 hour: 12,
+                 minute: 0,
++                manual_points_text: config.manual_points.text(),
++                manual_checkin_text: config.manual_points.checkin_text(),
++                manual_points_system: config.manual_points.coordinate_system,
+                 face_check: config.face_check,
+                 plan: None,
+                 route_mode: crate::track::generate_road::RouteMode::from_str(&config.route_mode),
+diff --git a/src/ui/msgs.rs b/src/ui/msgs.rs
+index 3f342af..6d684c3 100644
+--- a/src/ui/msgs.rs
++++ b/src/ui/msgs.rs
+@@ -154,7 +154,8 @@ impl App {
+                     // Filter before coalescing messages: a late reply must not
+                     // discard the current record's reply in the same frame.
+                     if raw.get("rrid").and_then(|v| v.as_i64()) == self.records_page.detail_rrid
+-                        && self.records_page.detail_rrid.is_some() {
++                        && self.records_page.detail_rrid.is_some()
++                    {
+                         detail_raw = Some(raw);
+                     }
+                 }
+@@ -195,7 +196,7 @@ impl App {
+                     .as_ref()
+                     .map(|s| s.uid == *uid && s.unid == *unid)
+                     .unwrap_or(false)
+-                    || self.identity.anchor_coordinate().ok() != *anchor
++                    || self.run_anchor().ok() != *anchor
+                 {
+                     self.osm_page.busy = false;
+                     self.network = None;
+@@ -290,8 +291,7 @@ impl App {
+                 .map(|s| s.uid == inputs.uid && s.unid == inputs.unid)
+                 .unwrap_or(false)
+                 && self
+-                    .identity
+-                    .anchor_coordinate()
++                    .run_anchor()
+                     .map(|a| a == inputs.anchor)
+                     .unwrap_or(false)
+             {
+diff --git a/src/ui/road_tools.rs b/src/ui/road_tools.rs
+index 5690740..24c2df6 100644
+--- a/src/ui/road_tools.rs
++++ b/src/ui/road_tools.rs
+@@ -229,8 +229,7 @@ impl App {
+         self.osm_page.status = "正在后台读取离线缓存…".into();
+         self.run_page.route_mode = crate::track::generate_road::RouteMode::Road;
+         let anchor = self
+-            .identity
+-            .anchor_coordinate()
++            .run_anchor()
+             .unwrap_or(crate::location::Coordinate::new(0., 0., 0.).unwrap());
+         let tx = self.net_tx.clone();
+         let key = key.to_string();
+@@ -244,6 +243,7 @@ impl App {
+                     unid: entry.school,
+                     anchor,
+                     points: entry.points,
++                    checkin_points: Vec::new(),
+                     fences: entry.fences,
+                     loaded_ms: entry.loaded_ms,
+                 });
+@@ -270,7 +270,7 @@ impl App {
+             .run_page
+             .preview_inputs
+             .as_ref()
+-            .map(|i| (i.fences.as_slice(), i.points.as_slice()))
++            .map(|i| (i.fences.as_slice(), i.checkin_points.as_slice()))
+             .unwrap_or((&[], &[]));
+         match crate::track::analysis::analyze(text, fences, points) {
+             Ok(a) => {
+diff --git a/src/ui/run.rs b/src/ui/run.rs
+index 3a5f650..757b0d1 100644
+--- a/src/ui/run.rs
++++ b/src/ui/run.rs
+@@ -67,6 +67,8 @@ pub struct PreviewInputs {
+     pub unid: String,
+     pub anchor: crate::location::Coordinate,
+     pub points: Vec<(f64, f64)>,
++    #[serde(default)]
++    pub checkin_points: Vec<(f64, f64)>,
+     pub fences: Vec<Vec<(f64, f64)>>,
+     pub loaded_ms: i64,
+ }
+@@ -79,6 +81,10 @@ pub struct RunPage {
+     pub pace_max: f32,
+     /// 手动绝对海拔（米）；空白表示使用生成器默认海拔。
+     pub manual_altitude: String,
++    pub manual_points_text: String,
++    pub manual_checkin_text: String,
++    pub manual_points_system: crate::api::manual_points::CoordinateSystem,
++    pub manual_points_status: String,
+     /// 0=随机时刻 1=指定时刻
+     pub start_mode: usize,
+     pub days_ago: i64,
+@@ -109,6 +115,129 @@ pub struct RunPage {
+     pub base_map_request: Option<u64>,
+ }
+ 
++#[cfg(test)]
++mod manual_points_ui_tests {
++    use super::*;
++    use crate::api::{
++        manual_points::{CoordinateSystem, Settings},
++        model,
++    };
++
++    fn frame(app: &mut App, ctx: &egui::Context, events: Vec<egui::Event>) -> egui::FullOutput {
++        ctx.run(
++            egui::RawInput {
++                screen_rect: Some(egui::Rect::from_min_size(
++                    egui::Pos2::ZERO,
++                    egui::vec2(880.0, 720.0),
++                )),
++                events,
++                ..Default::default()
++            },
++            |ctx| {
++                egui::CentralPanel::default().show(ctx, |ui| app.draw_manual_points(ui));
++            },
++        )
++    }
++
++    fn click_button(app: &mut App, ctx: &egui::Context, label: &str) {
++        let output = frame(app, ctx, vec![]);
++        let pos = output
++            .shapes
++            .iter()
++            .find_map(|shape| match &shape.shape {
++                egui::Shape::Text(text) if text.galley.text() == label => {
++                    Some(text.pos + text.galley.size() / 2.0)
++                }
++                _ => None,
++            })
++            .expect("manual settings button must be visible");
++        for pressed in [true, false] {
++            frame(
++                app,
++                ctx,
++                vec![
++                    egui::Event::PointerMoved(pos),
++                    egui::Event::PointerButton {
++                        pos,
++                        button: egui::PointerButton::Primary,
++                        pressed,
++                        modifiers: Default::default(),
++                    },
++                ],
++            );
++        }
++    }
++
++    #[test]
++    fn saved_selection_updates_anchor_invalidates_preview_and_can_restore_server_mode() {
++        struct DataDir(std::path::PathBuf);
++        impl Drop for DataDir {
++            fn drop(&mut self) {
++                crate::platform::TEST_DATA_DIR.with(|p| *p.borrow_mut() = None);
++                let _ = std::fs::remove_dir_all(&self.0);
++            }
++        }
++        let dir = DataDir(
++            std::env::temp_dir().join(format!("manual-points-ui-{}", uuid::Uuid::new_v4())),
++        );
++        std::fs::create_dir_all(&dir.0).unwrap();
++        crate::platform::TEST_DATA_DIR.with(|p| *p.borrow_mut() = Some(dir.0.clone()));
++        let identity = model::HeaderIdentity::default();
++        let original_anchor = identity.anchor_coordinate().unwrap();
++        let device_id = identity.device_id.clone();
++        let session = model::Session {
++            uid: 7,
++            token: "fixture".into(),
++            unid: "school-a".into(),
++            ..Default::default()
++        };
++        let context = egui::Context::default();
++        let mut app = App::from_state(
++            &context,
++            identity,
++            session.clone(),
++            model::Config::default(),
++        );
++        app.run_page.preview_key = "previous-preview".into();
++        let settings = Settings::from_text(
++            "39.9,116.4\n39.901,116.401\n39.9,116.402",
++            "39.9005,116.401",
++            CoordinateSystem::Gcj02,
++            &session.unid,
++        )
++        .unwrap();
++        app.apply_manual_points(settings).unwrap();
++        assert_eq!(app.run_anchor().unwrap().latitude, 39.9);
++        assert!(app.run_page.preview_key.is_empty());
++        assert_eq!(app.identity.device_id, device_id);
++        assert_eq!(app.identity.anchor_coordinate().unwrap(), original_anchor);
++        let config = model::load_config();
++        assert!(config.manual_points.enabled);
++        let restored = App::from_state(
++            &egui::Context::default(),
++            app.identity.clone(),
++            session,
++            config,
++        );
++        assert_eq!(restored.run_page.manual_points_text.lines().count(), 3);
++        assert_eq!(restored.run_page.manual_checkin_text.lines().count(), 1);
++        assert_eq!(restored.run_anchor().unwrap(), app.run_anchor().unwrap());
++        app.run_page.manual_checkin_text.clear();
++        click_button(&mut app, &context, "保存并启用手动点位");
++        assert!(app.run_page.manual_points_status.contains("打卡点"));
++        assert_eq!(model::load_config().manual_points.checkin_points.len(), 1);
++        app.run_page.manual_points_text = "invalid".into();
++        click_button(&mut app, &context, "保存并启用手动点位");
++        assert!(app.run_page.manual_points_status.contains("第 1 行"));
++        assert_eq!(model::load_config().manual_points.route_points.len(), 3);
++        app.session.as_mut().unwrap().unid = "school-b".into();
++        assert!(app.run_anchor().is_err());
++        click_button(&mut app, &context, "使用服务器点位");
++        assert!(!model::load_config().manual_points.enabled);
++        assert_eq!(app.run_anchor().unwrap(), original_anchor);
++    }
++}
++
+ /// 一次提交的确定方案（进入页面/参数变更时抽样生成）。
+ #[derive(Debug, Clone)]
+ pub struct RunPlan {
+@@ -278,6 +407,109 @@ impl RunPage {
+ }
+ 
+ impl App {
++    pub(crate) fn run_anchor(&self) -> Result<crate::location::Coordinate, String> {
++        crate::api::manual_points::effective_anchor(
++            &self.identity,
++            self.session.as_ref().map(|s| s.unid.as_str()).unwrap_or(""),
++            &self.config.manual_points,
++        )
++    }
++
++    fn apply_manual_points(
++        &mut self,
++        settings: crate::api::manual_points::Settings,
++    ) -> Result<(), String> {
++        let mut config = self.config.clone();
++        config.manual_points = settings;
++        crate::api::model::save_config(&config)?;
++        self.config = config;
++        self.run_page.preview_cancel.cancel();
++        self.run_page.preview_inputs = None;
++        self.run_page.preview = None;
++        self.run_page.preview_key.clear();
++        self.run_page.preview_stale = true;
++        self.run_page.map_fitted = false;
++        self.status = if self.config.manual_points.enabled {
++            format!(
++                "已启用 {} 个定位点、{} 个打卡点",
++                self.config.manual_points.route_points.len(),
++                self.config.manual_points.checkin_points.len()
++            )
++        } else {
++            "已切换为服务器点位".into()
++        };
++        self.run_page.manual_points_status = self.status.clone();
++        if self.run_page.route_mode == RouteMode::Road {
++            self.refresh_points();
++        }
++        Ok(())
++    }
++
++    fn draw_manual_points(&mut self, ui: &mut egui::Ui) {
++        use crate::api::manual_points::{CoordinateSystem, Settings};
++        let active = self.config.manual_points.enabled;
++        let title = if active {
++            format!(
++                "手动点位设置（{} 个定位点 / {} 个打卡点）",
++                self.config.manual_points.route_points.len(),
++                self.config.manual_points.checkin_points.len()
++            )
++        } else {
++            "手动点位设置（当前使用服务器点位）".into()
++        };
++        egui::CollapsingHeader::new(title)
++            .id_salt("manual_points_settings")
++            .default_open(active)
++            .show(ui, |ui| {
++                ui.label("两组坐标分别设置，每行填写：纬度,经度。");
++                mobile::row(ui, |ui| {
++                    ui.label("坐标来源：");
++                    ui.selectable_value(&mut self.run_page.manual_points_system, CoordinateSystem::Gcj02, "高德/腾讯（GCJ-02）");
++                    ui.selectable_value(&mut self.run_page.manual_points_system, CoordinateSystem::Bd09, "百度（BD-09）");
++                });
++                ui.label("定位点（轨迹点）：3–100 个，用于生成路线，不要重复首点。");
++                ui.add(egui::TextEdit::multiline(&mut self.run_page.manual_points_text)
++                    .id_salt("manual_points_editor")
++                    .desired_rows(5)
++                    .desired_width(f32::INFINITY)
++                    .hint_text("纬度,经度\n纬度,经度\n纬度,经度"));
++                ui.label("打卡点：1–30 个，只用于打卡标记和经过判断，不参与路线生成。");
++                ui.add(egui::TextEdit::multiline(&mut self.run_page.manual_checkin_text)
++                    .id_salt("manual_checkin_editor").desired_rows(3).desired_width(f32::INFINITY)
++                    .hint_text("独立打卡点：纬度,经度"));
++                ui.label("两组点位一并保存，使用同一坐标系；定位锚点使用第一个定位点。仅对当前学校生效。");
++                ui.label("旧版点位保留为定位点，请单独填写打卡点。学校策略必经点仍会校验。");
++                ui.label("手动点位不会修改学校后台设置，服务器仍按学校规则判断是否接受。");
++                let editable = !self.any_busy();
++                mobile::row(ui, |ui| {
++                    if ui.add_enabled(editable && self.session.is_some(), egui::Button::new("保存并启用手动点位")).clicked() {
++                        let school = self.session.as_ref().unwrap().unid.clone();
++                        let result = Settings::from_text(&self.run_page.manual_points_text, &self.run_page.manual_checkin_text, self.run_page.manual_points_system, &school)
++                            .and_then(|settings| self.apply_manual_points(settings));
++                        if let Err(error) = result {
++                            self.run_page.manual_points_status = error;
++                        }
++                    }
++                    if ui.add_enabled(editable && active, egui::Button::new("使用服务器点位")).clicked() {
++                        let mut settings = self.config.manual_points.clone();
++                        settings.enabled = false;
++                        if let Err(error) = self.apply_manual_points(settings) {
++                            self.run_page.manual_points_status = error;
++                        }
++                    }
++                });
++                if !editable {
++                    ui.label("后台任务完成后可保存或切换点位。");
++                }
++                if self.session.is_none() {
++                    ui.label("请先登录，再为当前学校保存点位。");
++                }
++                if !self.run_page.manual_points_status.is_empty() {
++                    ui.label(&self.run_page.manual_points_status);
++                }
++            });
++    }
++
+     pub fn draw_run(&mut self, ui: &mut egui::Ui) {
+         egui::ScrollArea::vertical()
+             .auto_shrink([false, false])
+@@ -425,6 +657,8 @@ impl App {
+             self.refresh_points();
+         }
+ 
++        self.draw_manual_points(ui);
++
+         ui.add_space(8.0);
+         let fmt_pace = |s: f32| format!("{}:{:02}", (s / 60.0) as i64, (s as i64) % 60);
+         let fmt_dur = |s: i64| {
+@@ -545,7 +779,8 @@ impl App {
+             if ui.button("查看路网与校区").clicked() {
+                 self.tab = 7;
+             }
+-            if self.identity.has_unconfigured_default_location()
++            if !self.config.manual_points.enabled
++                && self.identity.has_unconfigured_default_location()
+                 && ui.button("设置定位锚点").clicked()
+             {
+                 self.tab = 5;
+@@ -577,8 +812,7 @@ impl App {
+                         .map(|s| s.uid == input.uid && s.unid == input.unid)
+                         .unwrap_or(false)
+                         && self
+-                            .identity
+-                            .anchor_coordinate()
++                            .run_anchor()
+                             .map(|a| a == input.anchor)
+                             .unwrap_or(false)
+                         && (0..crate::api::model::POINTS_TTL_MS)
+@@ -592,7 +826,10 @@ impl App {
+                 "正在刷新学校围栏、策略与点位，请查看上方进度。"
+             } else if self.session.is_none() && !self.osm_page.offline {
+                 "本地地图已加载；请先登录，再刷新路线点位与围栏。"
+-            } else if self.identity.has_unconfigured_default_location() && !self.osm_page.offline {
++            } else if !self.config.manual_points.enabled
++                && self.identity.has_unconfigured_default_location()
++                && !self.osm_page.offline
++            {
+                 "本地地图已加载；请设置定位锚点，再刷新路线点位与围栏。"
+             } else if self.run_page.preview_inputs.is_some() {
+                 "路线数据已过期或账号/定位已改变，请刷新路线点位与围栏。"
+@@ -636,7 +873,7 @@ impl App {
+                 p.laps.len()
+             ));
+             ui.label(format!(
+-                "点位顺序：{}",
++                "定位点顺序：{}",
+                 (1..=p.checkpoints.len())
+                     .map(|i| i.to_string())
+                     .collect::<Vec<_>>()
+@@ -665,7 +902,8 @@ impl App {
+                     ("道路", egui::Color32::from_rgb(200, 208, 204)),
+                     ("建筑", egui::Color32::from_rgb(224, 194, 170)),
+                     ("路线", egui::Color32::from_rgb(30, 111, 216)),
+-                    ("打卡点", egui::Color32::from_rgb(240, 180, 0)),
++                    ("定位点", egui::Color32::from_rgb(240, 180, 0)),
++                    ("打卡点", egui::Color32::from_rgb(150, 50, 210)),
+                     ("起点", egui::Color32::from_rgb(22, 160, 90)),
+                     ("终点", egui::Color32::from_rgb(220, 38, 38)),
+                 ],
+@@ -696,6 +934,7 @@ impl App {
+                     bounds = super::map::collect_bounds(&p.edges);
+                     bounds.extend(p.route.iter().copied());
+                     bounds.extend(p.checkpoints.iter().copied());
++                    bounds.extend(inputs.checkin_points.iter().copied());
+                 }
+             }
+             if bounds.is_empty() {
+@@ -736,6 +975,16 @@ impl App {
+                 .map
+                 .draw_polyline(&painter, canvas, &p.route, route_c, 2.5);
+             let cp = egui::Color32::from_rgb(240, 180, 0);
++            for &(la, lo) in &inputs.checkin_points {
++                self.run_page.map.draw_point(
++                    &painter,
++                    canvas,
++                    la,
++                    lo,
++                    egui::Color32::from_rgb(150, 50, 210),
++                    5.5,
++                );
++            }
+             for &(la, lo) in &p.checkpoints {
+                 self.run_page
+                     .map
+@@ -779,25 +1028,28 @@ impl App {
+                 let loops = plan.dist * 1000.0 / p.length_m;
+                 if loops > 1.15 {
+                     format!(
+-                        "本次方案 {:.2} km · 单圈 {:.0} m × {:.1} 圈 · {} 打卡点",
++                        "本次方案 {:.2} km · 单圈 {:.0} m × {:.1} 圈 · {} 定位点 / {} 打卡点",
+                         plan.dist,
+                         p.length_m,
+                         loops,
+-                        p.checkpoints.len()
++                        p.checkpoints.len(),
++                        inputs.checkin_points.len()
+                     )
+                 } else {
+                     format!(
+-                        "本次方案 {:.2} km · 路线 {:.0} m · {} 打卡点",
++                        "本次方案 {:.2} km · 路线 {:.0} m · {} 定位点 / {} 打卡点",
+                         plan.dist,
+                         p.length_m,
+-                        p.checkpoints.len()
++                        p.checkpoints.len(),
++                        inputs.checkin_points.len()
+                     )
+                 }
+             } else {
+                 format!(
+-                    "本次方案 {:.2} km · {} 打卡点",
++                    "本次方案 {:.2} km · {} 定位点 / {} 打卡点",
+                     plan.dist,
+-                    p.checkpoints.len()
++                    p.checkpoints.len(),
++                    inputs.checkin_points.len()
+                 )
+             };
+             painter.text(
+diff --git a/src/api/manual_points.rs b/src/api/manual_points.rs
+new file mode 100644
+index 0000000..e792c52
+--- /dev/null
++++ b/src/api/manual_points.rs
+@@ -0,0 +1,447 @@
++//! Explicit, school-scoped local points. Never stored as server point-cache data.
++
++use crate::location::Coordinate;
++use serde::{Deserialize, Serialize};
++use serde_json::{json, Value};
++
++#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum CoordinateSystem {
++    #[default]
++    Gcj02,
++    Bd09,
++}
++
++#[derive(Debug, Clone, Default, Serialize, Deserialize)]
++#[serde(default)]
++pub struct Settings {
++    pub enabled: bool,
++    pub school_unid: String,
++    pub coordinate_system: CoordinateSystem,
++    // Legacy points are route coordinates only; never infer check-in locations.
++    #[serde(alias = "points")]
++    pub route_points: Vec<Coordinate>,
++    pub checkin_points: Vec<Coordinate>,
++}
++
++impl Settings {
++    pub fn from_text(
++        route: &str,
++        checkin: &str,
++        system: CoordinateSystem,
++        school: &str,
++    ) -> Result<Self, String> {
++        let settings = Self {
++            enabled: true,
++            school_unid: school.to_owned(),
++            coordinate_system: system,
++            route_points: parse_points(route, "定位点", 3, 100)?,
++            checkin_points: parse_points(checkin, "打卡点", 1, 30)?,
++        };
++        settings.validate_for(school)?;
++        Ok(settings)
++    }
++
++    pub fn text(&self) -> String {
++        format_points(&self.route_points)
++    }
++    pub fn checkin_text(&self) -> String {
++        format_points(&self.checkin_points)
++    }
++
++    pub fn validate_for(&self, school: &str) -> Result<(), String> {
++        if school.trim().is_empty() || school != self.school_unid {
++            return Err("手动点位属于其他学校，请为当前学校重新保存或切回服务器点位".into());
++        }
++        validate_points(&self.route_points, "定位点", 3, 100)?;
++        validate_points(&self.checkin_points, "打卡点", 1, 30)?;
++        for point in self.route_points.iter().chain(&self.checkin_points) {
++            let (a, o) = self.bd(point);
++            Coordinate::new(a, o, 0.0)?;
++            let (a, o) = self.gcj(point);
++            Coordinate::new(a, o, 0.0)?;
++        }
++        Ok(())
++    }
++
++    /// Route coordinates retain the order entered by the user (BD-09).
++    pub fn route_bd(&self, school: &str) -> Result<Vec<(f64, f64)>, String> {
++        self.validate_for(school)?;
++        Ok(self.route_points.iter().map(|p| self.bd(p)).collect())
++    }
++
++    fn bd(&self, point: &Coordinate) -> (f64, f64) {
++        match self.coordinate_system {
++            CoordinateSystem::Gcj02 => {
++                crate::track::geom::gcj02_to_bd09(point.latitude, point.longitude)
++            }
++            CoordinateSystem::Bd09 => (point.latitude, point.longitude),
++        }
++    }
++
++    fn gcj(&self, point: &Coordinate) -> (f64, f64) {
++        match self.coordinate_system {
++            CoordinateSystem::Gcj02 => (point.latitude, point.longitude),
++            CoordinateSystem::Bd09 => {
++                crate::track::wire::bd09_to_gcj02(point.latitude, point.longitude)
++            }
++        }
++    }
++
++    pub fn anchor(&self, school: &str) -> Result<Coordinate, String> {
++        self.validate_for(school)?;
++        let (a, o) = self.gcj(&self.route_points[0]);
++        Coordinate::new(a, o, 0.0)
++    }
++
++    pub fn payload(&self, school: &str) -> Result<Vec<Value>, String> {
++        self.validate_for(school)?;
++        Ok(self
++            .checkin_points
++            .iter()
++            .enumerate()
++            .map(|(i, p)| {
++                let (lat, lon) = self.bd(p);
++                let (glat, glon) = self.gcj(p);
++                json!({
++                    "lat": lat, "lon": lon, "glat": glat, "glon": glon,
++                    "pointName": format!("手动打卡点 {}", i + 1),
++                    "isFixed": 0, "isMustPoint": false,
++                })
++            })
++            .collect())
++    }
++}
++
++fn format_points(points: &[Coordinate]) -> String {
++    points
++        .iter()
++        .map(|p| format!("{:.7},{:.7}", p.latitude, p.longitude))
++        .collect::<Vec<_>>()
++        .join("\n")
++}
++
++fn parse_points(
++    text: &str,
++    label: &str,
++    min: usize,
++    max: usize,
++) -> Result<Vec<Coordinate>, String> {
++    let mut points = Vec::new();
++    for (index, line) in text.lines().enumerate() {
++        let line = line.trim();
++        if line.is_empty() {
++            continue;
++        }
++        let fields: Vec<_> = line
++            .split(|c: char| c == ',' || c == '，' || c.is_whitespace())
++            .filter(|s| !s.is_empty())
++            .collect();
++        let parse = || -> Result<Coordinate, String> {
++            if fields.len() != 2 {
++                return Err("每行填写两个数字：纬度,经度".into());
++            }
++            Coordinate::new(
++                fields[0].parse().map_err(|_| "纬度不是数字")?,
++                fields[1].parse().map_err(|_| "经度不是数字")?,
++                0.0,
++            )
++        };
++        points.push(parse().map_err(|e| format!("{label}第 {} 行：{e}", index + 1))?);
++        if points.len() > max {
++            return Err(format!("{label}最多 {max} 个"));
++        }
++    }
++    validate_points(&points, label, min, max)?;
++    Ok(points)
++}
++
++fn validate_points(
++    points: &[Coordinate],
++    label: &str,
++    min: usize,
++    max: usize,
++) -> Result<(), String> {
++    if !(min..=max).contains(&points.len()) {
++        return Err(format!(
++            "请单独设置 {min} 至 {max} 个{label}；旧版点位仅保留为定位点，请补填打卡点后保存"
++        ));
++    }
++    for (i, point) in points.iter().enumerate() {
++        point
++            .validate()
++            .map_err(|e| format!("{label} {}：{e}", i + 1))?;
++        if point.latitude == 0.0 && point.longitude == 0.0 {
++            return Err(format!("{label} {} 不能为 0,0", i + 1));
++        }
++        if points[..i].iter().any(|p| p.is_near(*point, 1e-6)) {
++            return Err(format!("{label} {} 与前面重复", i + 1));
++        }
++    }
++    Ok(())
++}
++
++/// Manual mode uses its first point as the request anchor without changing device identity.
++pub fn effective_anchor(
++    identity: &super::model::HeaderIdentity,
++    school: &str,
++    settings: &Settings,
++) -> Result<Coordinate, String> {
++    if settings.enabled {
++        settings.anchor(school)
++    } else {
++        identity.anchor_coordinate()
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    fn settings() -> Settings {
++        Settings::from_text(
++            "39.9000,116.4000\n39.9010，116.4010\n39.9000 116.4020",
++            "39.9005,116.4010",
++            CoordinateSystem::Gcj02,
++            "school-a",
++        )
++        .unwrap()
++    }
++
++    #[test]
++    fn coordinates_round_trip_and_local_points_have_no_server_ids() {
++        let s = settings();
++        let payload = s.payload("school-a").unwrap();
++        for (point, original) in payload.iter().zip(&s.checkin_points) {
++            let bd = super::super::fence::point_xy(point).unwrap();
++            let gcj = crate::track::wire::bd09_to_gcj02(bd.0, bd.1);
++            assert!((gcj.0 - original.latitude).abs() < 1e-6);
++            assert!((gcj.1 - original.longitude).abs() < 1e-6);
++            assert!(point.get("id").is_none());
++        }
++        let saved = serde_json::to_string(&s).unwrap();
++        let restored: Settings = serde_json::from_str(&saved).unwrap();
++        assert_eq!(restored.payload("school-a").unwrap(), payload);
++        assert!(restored.payload("school-b").is_err());
++        assert_eq!(restored.anchor("school-a").unwrap(), s.route_points[0]);
++        let bd = Settings {
++            coordinate_system: CoordinateSystem::Bd09,
++            route_points: s
++                .route_bd("school-a")
++                .unwrap()
++                .into_iter()
++                .map(|p| Coordinate::new(p.0, p.1, 0.).unwrap())
++                .collect(),
++            checkin_points: payload
++                .iter()
++                .map(|v| {
++                    Coordinate::new(v["lat"].as_f64().unwrap(), v["lon"].as_f64().unwrap(), 0.0)
++                        .unwrap()
++                })
++                .collect(),
++            ..s.clone()
++        };
++        assert!(bd
++            .anchor("school-a")
++            .unwrap()
++            .is_near(s.route_points[0], 1e-6));
++        let converted = bd.payload("school-a").unwrap();
++        for (actual, expected) in converted.iter().zip(&payload) {
++            for field in ["lat", "lon", "glat", "glon"] {
++                assert!(
++                    (actual[field].as_f64().unwrap() - expected[field].as_f64().unwrap()).abs()
++                        < 1e-6
++                );
++            }
++        }
++    }
++
++    #[test]
++    fn rejects_empty_invalid_duplicate_and_oversized_input() {
++        for text in [
++            "",
++            "39.9,116.4",
++            "39.9,116.4\n39.9,116.4\n39.91,116.41",
++            "NaN,116.4\n39.91,116.41\n39.92,116.42",
++            "91,116.4\n39.91,116.41\n39.92,116.42",
++            "39.9,181\n39.91,116.41\n39.92,116.42",
++            "39.9,116.4,1",
++            "0,0\n39.91,116.41\n39.92,116.42",
++        ] {
++            assert!(
++                Settings::from_text(
++                    text,
++                    "39.9005,116.4010",
++                    CoordinateSystem::Gcj02,
++                    "school-a"
++                )
++                .is_err(),
++                "{text}"
++            );
++        }
++        assert!(Settings::from_text(
++            &"39.9,116.4\n".repeat(101),
++            "39.9005,116.4010",
++            CoordinateSystem::Gcj02,
++            "school-a"
++        )
++        .is_err());
++    }
++
++    #[test]
++    fn legacy_config_never_invents_checkin_points() {
++        let original = settings();
++        let old =
++            json!({"enabled": true, "school_unid": "school-a", "points": original.route_points});
++        let restored: Settings = serde_json::from_value(old).unwrap();
++        assert_eq!(restored.route_points, original.route_points);
++        assert!(restored.checkin_points.is_empty());
++        assert!(restored
++            .validate_for("school-a")
++            .unwrap_err()
++            .contains("打卡点"));
++        let new = serde_json::to_value(&original).unwrap();
++        assert!(new.get("points").is_none());
++        assert_eq!(new["route_points"].as_array().unwrap().len(), 3);
++        assert_eq!(new["checkin_points"].as_array().unwrap().len(), 1);
++    }
++
++    #[test]
++    fn moving_checkins_does_not_change_route_and_payload_reports_actual_passes() {
++        let s = settings();
++        let mut client = super::super::client::ApiClient::new(
++            Default::default(),
++            Some(super::super::model::Session {
++                unid: "school-a".into(),
++                ..Default::default()
++            }),
++        );
++        client.set_test_host("http://127.0.0.1:1".into());
++        let anchor = s.anchor("school-a").unwrap();
++        let load = |client: &mut super::super::client::ApiClient, settings: &Settings| {
++            super::super::points::fetch_run_data(
++                client,
++                anchor,
++                None,
++                &[(20., 100.)],
++                settings,
++                &mut |_| {},
++            )
++            .unwrap()
++        };
++        let initial = load(&mut client, &s);
++        assert_eq!(initial.route_points, s.route_bd("school-a").unwrap());
++        let track = crate::track::generator::build(
++            1200.,
++            600,
++            7,
++            (anchor.latitude, anchor.longitude),
++            1_700_000_000_000,
++            &initial.route_points,
++        );
++        let sample = track.locations.iter().find(|p| p.ptype != -1).unwrap();
++        let mut changed = s.clone();
++        changed.coordinate_system = CoordinateSystem::Bd09;
++        changed.route_points = initial
++            .route_points
++            .iter()
++            .map(|p| Coordinate::new(p.0, p.1, 0.).unwrap())
++            .collect();
++        changed.checkin_points = vec![
++            Coordinate::new(sample.gLat, sample.gLng, 0.).unwrap(),
++            Coordinate::new(30., 110., 0.).unwrap(),
++        ];
++        let result = load(&mut client, &changed);
++        assert_eq!(initial.route_points, result.route_points);
++        let wrapper = crate::track::wire::five_point_wrapper(
++            &result.checkin_points,
++            &track,
++            &Default::default(),
++        );
++        crate::track::wire::validate_five_point_wrapper(&wrapper).unwrap();
++        let outer: Value = serde_json::from_str(&wrapper).unwrap();
++        let checks: Vec<Value> =
++            serde_json::from_str(outer["fivePointJson"].as_str().unwrap()).unwrap();
++        assert_eq!(checks.len(), 2);
++        assert_eq!(checks[0]["isPass"], true);
++        assert_eq!(checks[1]["isPass"], false);
++    }
++
++    #[test]
++    fn checkins_have_independent_validation_and_may_overlap_route_points() {
++        let route = settings().text();
++        for checkins in [
++            "".to_owned(),
++            "NaN,116.4".into(),
++            "39.9,116.4\n39.9,116.4".into(),
++            (0..31)
++                .map(|i| format!("39.{:05},116.4", 90000 + i * 10))
++                .collect::<Vec<_>>()
++                .join("\n"),
++        ] {
++            assert!(
++                Settings::from_text(&route, &checkins, CoordinateSystem::Gcj02, "school-a")
++                    .is_err()
++            );
++        }
++        assert!(Settings::from_text(
++            &route,
++            "39.9000,116.4000",
++            CoordinateSystem::Gcj02,
++            "school-a"
++        )
++        .is_ok());
++    }
++
++    #[test]
++    fn manual_selection_avoids_the_server_and_preserves_server_cache() {
++        let dir = std::env::temp_dir().join(format!("manual-points-{}", uuid::Uuid::new_v4()));
++        std::fs::create_dir_all(&dir).unwrap();
++        crate::platform::TEST_DATA_DIR.with(|p| *p.borrow_mut() = Some(dir.clone()));
++        let mut config = super::super::model::Config::default();
++        config.manual_points = settings();
++        super::super::model::save_config(&config).unwrap();
++        std::fs::write(dir.join("points_cache.json"), "server-cache-sentinel").unwrap();
++        let session = super::super::model::Session {
++            uid: 7,
++            unid: "school-a".into(),
++            token: "fixture".into(),
++            ..Default::default()
++        };
++        let mut client = super::super::client::ApiClient::new(Default::default(), Some(session));
++        // Any attempted HTTP request would fail, so success verifies manual selection precedes HTTP/cache.
++        client.set_test_host("http://127.0.0.1:1".into());
++        let mut logs = Vec::new();
++        let anchor = effective_anchor(&client.identity, "school-a", &config.manual_points).unwrap();
++        let points = super::super::points::fetch_points(&mut client, anchor, &mut |s| {
++            logs.push(s.to_owned())
++        })
++        .unwrap();
++        assert_eq!(points.len(), 1);
++        assert!(logs.iter().any(|s| s.contains("手动点位")));
++        let route = config.manual_points.route_bd("school-a").unwrap();
++        let track = crate::track::generator::build(
++            1200.0,
++            600,
++            7,
++            (anchor.latitude, anchor.longitude),
++            1_700_000_000_000,
++            &route,
++        );
++        track.validate_consistency().unwrap();
++        let wrapper = crate::track::wire::five_point_wrapper(&points, &track, &Default::default());
++        crate::track::wire::validate_five_point_wrapper(&wrapper).unwrap();
++        assert_eq!(
++            std::fs::read_to_string(dir.join("points_cache.json")).unwrap(),
++            "server-cache-sentinel"
++        );
++        client.login.as_mut().unwrap().unid = "school-b".into();
++        assert!(super::super::points::fetch_points(&mut client, anchor, &mut |_| {}).is_err());
++        config.manual_points.enabled = false;
++        super::super::model::save_config(&config).unwrap();
++        client.login.as_mut().unwrap().unid = "school-a".into();
++        assert!(super::super::points::fetch_points(&mut client, anchor, &mut |_| {}).is_err());
++        crate::platform::TEST_DATA_DIR.with(|p| *p.borrow_mut() = None);
++        std::fs::remove_dir_all(dir).unwrap();
++    }
++}

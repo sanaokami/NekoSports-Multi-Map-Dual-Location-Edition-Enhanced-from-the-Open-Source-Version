@@ -1,0 +1,251 @@
+   Compiling nekosportsworldtool v0.3.0 (/workspace/scratch/9c947dbd3097/NekoSportsWorldTool)
+warning: function `fetch_points` is never used
+  --> src/api/points.rs:57:8
+   |
+57 | pub fn fetch_points(
+   |        ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `nekosportsworldtool` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.12s
+     Running unittests src/lib.rs (target/debug/deps/nekosportsworldtool-fa26c0969070848e)
+
+running 189 tests
+test api::campus::area_tests::points_area_uses_explicit_selected_id_without_inventing_one ... ok
+test api::cheat::tests::missing_malformed_and_empty_self_never_mean_clean ... ok
+test api::cheat::tests::timestamp_bounds_and_message_roundtrip ... ok
+test api::campus::tests::names_and_confirmation_are_bound_to_real_fences_and_school ... ok
+test api::cheat::tests::details_preserve_reason_and_only_use_explicit_record_id ... ok
+test api::fence::metadata_tests::explicit_area_id_survives_absent_fences ... ok
+test api::client::business_data_tests::successful_json_text_data_matches_object_and_array_responses ... ok
+test api::fence::metadata_tests::json_text_fences_and_numeric_strings_preserve_area_and_geometry ... ok
+test api::fence::metadata_tests::missing_invalid_and_explicitly_empty_fences_remain_distinct ... ok
+test api::fence::metadata_tests::normalized_coordinates_have_consistent_aliases ... ok
+test api::fence::tests::point_xy_prefers_bd_then_gcj_fallback ... ok
+test api::flow::verification_tests::consecutive_results_do_not_share_details ... ok
+test api::flow::verification_tests::reading_a_detail_is_not_a_successful_grade ... ok
+test api::fence::metadata_tests::optional_metadata_does_not_invent_ids ... ok
+test api::gt4::tests::test_gee_rsa_key_shape ... ok
+test api::gt4::tests::test_get_w_shape ... ok
+test api::manual_points::tests::checkins_have_independent_validation_and_may_overlap_route_points ... ok
+test api::manual_points::tests::coordinates_round_trip_and_local_points_have_no_server_ids ... ok
+test api::manual_points::tests::legacy_config_never_invents_checkin_points ... ok
+test api::gt4::tests::test_pow_msg_and_sign ... ok
+test api::client::auth_tests::authenticated_401_requires_login_without_exposing_raw_response ... ok
+test api::client::auth_tests::chinese_http_errors_are_truncated_on_character_boundaries ... ok
+test api::client::auth_tests::login_and_non_auth_http_failures_do_not_expire_a_session ... ok
+test api::model::points_cache_tests::cache_is_scoped_to_anchor ... ok
+test api::manual_points::tests::rejects_empty_invalid_duplicate_and_oversized_input ... ok
+test api::model::storage_tests::incomplete_native_device_info_cannot_replace_identity ... ok
+test api::model::storage_tests::session_roundtrip_and_logout_use_private_data_directory ... ok
+test api::points::route_tests::direct_envelope_points_decode_json_text_business_data ... ok
+test api::points::route_tests::first_required_point_and_order_survive_deduplication ... ok
+test api::points::route_tests::response_errors_and_invalid_coordinates_are_not_cached_as_success ... ok
+test api::policy::tests::json_text_policy_preserves_required_points_and_rules ... ok
+test api::model::storage_tests::android_identity_import_persists_brand_and_reuses_uuid ... ok
+test api::client::business_data_tests::invalid_or_excessive_json_text_is_not_silently_empty ... ok
+test api::policy::tests::malformed_required_points_are_errors_not_omissions ... ok
+test api::records::tests::test_detail_serializes_camel_case ... ok
+test api::policy::tests::merges_all_recognized_lists_without_losing_first_point ... ok
+test api::school_roads::tests::coordinate_round_trip_and_query_scope ... ok
+test api::school_roads::tests::manual_map_loading_needs_neither_boundary_nor_school_id ... ok
+test api::school_roads::tests::no_boundary_download_is_point_scoped_without_inventing_fences ... ok
+test api::submission_guard::tests::exclusive_lock_and_account_isolation ... ok
+test api::school_roads::tests::saved_maps_can_be_listed_loaded_offline_and_deleted_safely ... ok
+test api::school_roads::tests::cache_is_school_and_fence_scoped_expires_and_propagates_failure ... ok
+test api::manual_points::tests::moving_checkins_does_not_change_route_and_payload_reports_actual_passes ... ok
+test api::submit::metric_tests::record_pace_has_decimal_protocol_scale ... ok
+test api::submission_guard::tests::torn_journal_fails_closed_and_is_not_overwritten ... ok
+test api::client::shared_auth_tests::one_rejection_stops_other_school_reads_and_only_notifies_once ... ok
+test api::manual_points::tests::manual_selection_avoids_the_server_and_preserves_server_cache ... ok
+test api::submission_guard::tests::explicit_rejection_allows_a_later_user_retry ... ok
+test api::submission_guard::tests::pending_survives_restart_and_missing_list_is_not_rejection ... ok
+test api::user::refresh_tests::cached_profile_and_failed_reads_cannot_claim_a_successful_refresh ... ok
+test crypto::decrypt::tests::test_decrypt_never_panics_on_garbage ... ok
+test crypto::decrypt::tests::test_fold32_and_paes_key_vectors ... ok
+test api::submit::submission_tests::successful_post_then_same_plan_only_sends_once ... ok
+test crypto::decrypt::tests::test_plain_response_passthrough ... ok
+test api::submit::submission_tests::unauthorized_post_invalidates_session_and_does_not_send_again ... ok
+test crypto::envelope::tests::test_aes_cbc_vector ... ok
+test api::submit::submission_tests::lost_response_reconciles_uuid_without_reposting ... ok
+test api::submit::submission_tests::missing_list_after_timeout_and_restart_never_reposts ... ok
+test crypto::envelope::tests::test_key_data_four ... ok
+test crypto::envelope::tests::test_md5_vector ... ok
+test crypto::envelope::tests::test_normalize_raw_key_data ... ok
+test crypto::envelope::tests::test_req_key ... ok
+test crypto::envelope::tests::test_envelope_roundtrip ... ok
+test crypto::header::tests::legacy_dalian_defaults_are_not_accepted_for_a_run ... ok
+test crypto::header::tests::test_android_header_shape ... ok
+test crypto::header::tests::test_install_time_stable_across_requests ... ok
+test crypto::header::tests::test_ios_header_shape ... ok
+test crypto::header::tests::test_token_sign_vector ... ok
+test crypto::sign::tests::test_url_sign ... ok
+test diagnostics::tests::secrets_in_errors_are_never_exported ... ok
+test location::tests::detects_legacy_default_location ... ok
+test location::tests::validates_bounds_and_accuracy ... ok
+test road_status::tests::failures_have_distinct_actions ... ok
+test crypto::sign::tests::test_signature_vectors ... ok
+test task_control::tests::cancellation_and_submission_are_mutually_exclusive ... ok
+test template::tests::parses_gpx_elevation_and_coordinates ... ok
+test template::tests::parses_json_aliases ... ok
+test textlog::tests::test_mask_long_and_multibyte ... ok
+test textlog::tests::test_mask_short_and_empty ... ok
+test textlog::tests::test_redact_json_nested_objects_and_arrays ... ok
+test textlog::tests::test_redact_json_preserves_other_values ... ok
+test textlog::tests::test_truncate_multibyte ... ok
+test textlog::tests::test_redact_json_sensitive_keys_case_insensitive ... ok
+test track::altitude::tests::parses_single_value_and_range ... ok
+test crypto::envelope::tests::test_rsa_encrypt_len ... ok
+test api::submit::submission_tests::explicit_rejection_can_be_retried_by_user_but_not_automatically ... ok
+test track::analysis::tests::gpx_distance_time_segments_and_boundary_are_analyzed_without_connecting_gaps ... ok
+test track::calorie::tests::test_avg_power_vector ... ok
+test track::calorie::tests::test_official_kcal_vectors ... ok
+test track::altitude::tests::rejects_non_finite_or_out_of_range_values ... ok
+test track::altitude::tests::range_mapping_stays_inside_requested_bounds ... ok
+test track::generate_road::preview_tests::preflight_reports_short_distance_and_marks_offroad_point ... ok
+test track::altitude::tests::override_replaces_every_bd_a_and_clears_ascent ... ok
+test track::generate_road::preview_tests::required_points_in_disconnected_school_roads_fail ... ok
+test track::generate_road::preview_tests::supplied_boundary_still_rejects_outside_points ... ok
+test track::model::tests::empty_track_is_rejected ... ok
+test track::model::tests::top_level_coordinate_is_derived_from_first_point ... ok
+test track::generate_road::preview_tests::preview_and_generation_share_required_points_options_and_seed ... ok
+test track::route_view::tests::full_and_partial_laps_sum_to_requested_distance ... ok
+test api::gt4image::tests::test_match_x_synthetic ... ok
+test api::submit::submission_tests::malformed_success_stays_pending ... ok
+test track::stats::tests::final_samples_drive_totals_and_partial_windows ... ok
+test track::tests::road_failure_does_not_ignore_distant_points_or_empty_fences ... ok
+test track::tests::test_bd09_to_gcj02_vector ... ok
+test track::tests::test_apply_fences_clips_crossing_edges ... ok
+test track::tests::test_coord_datum_roundtrip ... ok
+test track::postfix::tests::post_processing_preserves_exception_type_and_speed_limits ... ok
+test track::tests::test_generator_distribution ... ok
+test track::tests::test_point_snapping ... ok
+test track::generate_road::preview_tests::no_boundary_extra_mileage_reuses_the_same_checkpoint_circuit ... ok
+test crypto::decrypt::tests::test_full_response_decrypt_chain ... ok
+test track::tests::test_build_road_distribution ... ok
+test track::wire::regression_tests::point_status_and_metadata_are_identical_in_obs ... ok
+test crypto::decrypt::tests::test_rsa_recovered_digest_roundtrip ... ok
+test track::wire::regression_tests::protocol_times_use_beijing_even_on_utc_hosts ... ok
+test track::wire::validation_tests::laps_are_rebuilt_from_overridden_altitude ... ok
+test track::wire::validation_tests::rejects_empty_or_malformed_five_point_payload ... ok
+test ui::device::tests::location_changes_are_detected_until_saved ... ok
+test ui::jobs::road_load_tests::metadata_failure_keeps_loaded_roads_but_download_failure_stays_an_error ... ok
+test ui::device::tests::random_device_does_not_keep_a_previously_imported_brand ... ok
+test track::wire::regression_tests::lap_units_partial_laps_and_zero_steps ... ok
+test ui::layout_tests::delayed_401_from_old_token_cannot_remove_a_new_login ... ok
+test track::wire::regression_tests::encoded_obs_lap_pace_uses_seconds_not_decimal_minutes ... ok
+test ui::layout_tests::downloaded_roads_are_visible_while_points_load_and_survive_metadata_failure ... ok
+test ui::layout_tests::cancelling_download_discards_late_result_and_retry_is_reachable ... ok
+test ui::layout_tests::failed_network_load_clears_previous_preview ... ok
+test ui::layout_tests::failed_queries_are_not_empty_success_or_a_clean_cheat_result ... ok
+test ui::layout_tests::diagnostics_export_button_is_reachable_and_writes_no_account_fields ... ok
+test ui::layout_tests::compact_account_form_can_expand_and_scroll_to_login ... ok
+test ui::layout_tests::manual_map_completion_refreshes_metadata_once_without_discarding_map ... ok
+test track::tests::test_obs_object_structure ... ok
+test ui::layout_tests::obsolete_and_cancelled_preview_results_are_ignored_even_off_the_run_page ... ok
+test ui::layout_tests::old_session_notifications_and_results_cannot_override_a_fresh_login ... ok
+test ui::layout_tests::re_login_errors_remain_visible_instead_of_being_overwritten_by_expiry_banner ... ok
+test ui::layout_tests::expired_login_recovery_button_is_reachable_without_network_or_saved_password ... ok
+test ui::layout_tests::route_refresh_tests::malformed_fence_http_refresh_keeps_local_map_without_fabricating_preview ... ok
+test ui::layout_tests::route_refresh_tests::empty_boundary_fetches_policy_before_any_point_scoped_download ... ok
+test ui::layout_tests::invalid_manual_osm_reports_error_and_retry_reads_corrected_file_offline ... ok
+test ui::layout_tests::route_refresh_tests::run_base_map_can_pan_zoom_and_refit_a_reloaded_map ... ok
+test ui::layout_tests::run_page_distinguishes_active_refresh_from_idle_missing_data ... ok
+test track::generate_road::preview_tests::long_distance_repeats_inside_concave_campus_and_keeps_statistics ... ok
+test ui::layout_tests::school_401_clears_saved_session_but_preserves_manual_map_and_device_settings ... ok
+test track::tests::both_generators_bound_exception_geometry_and_speed ... ok
+test ui::layout_tests::session_wide_401_clears_login_and_late_job_results_cannot_restore_success ... ok
+test ui::layout_tests::school_download_controls_are_reachable_on_phone_and_desktop ... ok
+test ui::layout_tests::stale_network_results_cannot_replace_newer_school_or_manual_load ... ok
+test ui::layout_tests::violation_tests::active_submission_button_cannot_start_a_second_task ... ok
+test ui::layout_tests::violation_tests::late_record_detail_cannot_replace_current_violation_record ... ok
+test ui::layout_tests::violation_tests::mismatched_detail_finishes_with_an_error_for_the_requested_record ... ok
+test ui::layout_tests::manual_osm_button_loads_without_login_and_draws_roads_with_visible_status ... ok
+test ui::layout_tests::violation_tests::query_failure_missing_fields_and_stale_result_are_visible ... ok
+test ui::mobile::tests::compact_breakpoint_covers_phone_widths_but_not_desktop ... ok
+test ui::mobile::tests::decimal_input_rejects_non_finite_and_out_of_range_values ... ok
+test ui::mobile::tests::integer_input_rejects_invalid_or_out_of_range_without_a_replacement ... ok
+test ui::mobile::tests::numeric_errors_expand_rows_without_overlapping_following_controls ... ok
+test track::tests::test_windows_match_final_track_across_seeds ... ok
+test ui::layout_tests::run_page_exposes_metadata_failure_and_navigation_after_map_load ... ok
+test ui::mobile::tests::tab_bar_stays_inside_offscreen_phone_and_desktop_frames ... ok
+test ui::msgs::result_tests::popup_separates_partial_upload_reading_and_grade ... ok
+test ui::mobile::tests::responsive_parameter_row_wraps_without_invalid_or_overflowing_rectangles ... ok
+test ui::run::tests::date_change_applies_to_both_modes ... ok
+test ui::run::tests::days_ago_labels ... ok
+test ui::run::tests::editing_hhmm_resyncs_plan ... ok
+test ui::run::tests::ensure_plan_is_idempotent ... ok
+test ui::run::tests::future_specified_time_is_clamped_and_detectable ... ok
+test ui::run::tests::mode_switch_resyncs_time_only ... ok
+test ui::run::tests::never_schedules_future_start ... ok
+test ui::run::tests::random_mode_within_window_and_varies ... ok
+test ui::run::tests::random_window_detection ... ok
+test ui::run::tests::shape_change_keeps_specified_time ... ok
+test ui::run::tests::shuffle_changes_shape_in_specified_mode ... ok
+test ui::run::tests::shuffle_keeps_days_ago_in_specified_mode ... ok
+test ui::run::tests::shuffle_keeps_user_time_in_specified_mode ... ok
+test ui::run::tests::simultaneous_shape_and_date_change ... ok
+test ui::run::tests::simultaneous_shape_and_hhmm_change ... ok
+test ui::run::tests::specified_past_time_is_committed_as_is ... ok
+test ui::run::tests::specified_time_is_clamped_to_now ... ok
+test ui::run::tests::specified_today_past_hour_is_kept ... ok
+test update::tests::asset_pick_exact_and_fuzzy ... ok
+test update::tests::extract_tar_gz_root_binary ... ok
+test update::tests::extract_zip_nested_exe ... ok
+test update::tests::version_compare ... ok
+test ui::mobile::tests::wrapped_range_controls_reserve_width_before_the_parent_places_them ... ok
+test ui::run::manual_points_ui_tests::saved_selection_updates_anchor_invalidates_preview_and_can_restore_server_mode ... ok
+test ui::layout_tests::route_refresh_tests::explicit_null_boundary_refreshes_points_and_repeats_one_road_loop ... ok
+test ui::layout_tests::route_refresh_tests::string_data_http_refresh_reaches_a_complete_campus_preview ... ok
+test ui::layout_tests::violation_tests::related_record_button_scrolls_and_opens_only_the_explicit_id ... ok
+test ui::layout_tests::route_refresh_tests::run_base_map_draws_real_roads_and_buildings_without_route_metadata ... ok
+test ui::layout_tests::short_phone_data_page_can_scroll_and_operate_controls ... ok
+
+test result: ok. 189 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.98s
+
+     Running unittests src/main.rs (target/debug/deps/nekosportsworldtool-216604bf54013830)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/route_planner-229a472473671d16)
+
+running 8 tests
+test biomech::tests::gait_coupling_equation_holds ... ok
+test biomech::tests::fatigue_monotonic_capped ... ok
+test boundary::tests::disjoint_campuses_cannot_be_joined ... ok
+test boundary::tests::catches_narrow_notch_and_includes_boundary ... ok
+test biomech::tests::cadence_ou_stays_in_envelope ... ok
+test route::tests::repeat_loop_requires_a_return_path_even_for_a_single_checkpoint ... ok
+test smooth::regression_tests::reversal_preserves_turnaround_checkpoint ... ok
+test check::tests::viewport_query_only_returns_nearby_roads_without_mutating_graph ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/basic.rs (target/debug/deps/basic-f5e27e133e88133e)
+
+running 7 tests
+test test_osm_parse_minimal ... ok
+test test_point_in_polygon_and_fence ... ok
+test test_virtual_nodes_two_mid_edge_splits ... ok
+test test_virtual_node_projection_mid_edge ... ok
+test test_plan_route_closes_loop ... ok
+test test_plan_route_respects_start_and_order ... ok
+test test_route_visits_checkpoints ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests nekosportsworldtool
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests route_planner
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

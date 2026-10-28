@@ -1,0 +1,11 @@
+   Compiling nekosportsworldtool v0.3.0 (/workspace/scratch/9c947dbd3097/NekoSportsWorldTool)
+warning: function `fetch_points` is never used
+  --> src/api/points.rs:57:8
+   |
+57 | pub fn fetch_points(
+   |        ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `nekosportsworldtool` (lib) generated 1 warning
+    Finished `release` profile [optimized] target(s) in 1m 01s

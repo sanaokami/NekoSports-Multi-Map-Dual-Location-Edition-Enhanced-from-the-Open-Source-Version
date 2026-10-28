@@ -1,0 +1,46 @@
+﻿NekoSportsWorldTool 双点位版（Windows x64）
+
+此次修改
+1. 定位点（轨迹点）：3–100 个，用于路线生成；黄色标记。
+2. 打卡点：1–30 个，独立输入、保存，用于打卡元数据和经过判断；紫色标记。
+3. 手动模式移动打卡点不会改变路线；未经过的点不会被标为通过。
+4. 两组坐标采用同一坐标系：高德/腾讯 GCJ-02 或百度 BD-09。
+5. 两组点位保存到 config.json 的 route_points、checkin_points，仅对保存时的学校生效。
+6. 路线预览、提交、OBS 样本和 GPX 打卡覆盖分析均已接入分离后的数据。
+
+安装与旧配置迁移
+1. 退出旧程序，备份原 EXE 和 config.json。
+2. 用本包 nekosportsworldtool.exe 替换旧程序，保留原有配置和登录文件。
+   本次构建仅导入 Windows 系统 DLL，不依赖旧版 libunwind.dll；旧 DLL 留在目录中也不影响使用。
+3. 登录后进入“跑步”页，展开“手动点位设置”。
+4. 旧版 points 自动读入定位点输入框，不自动复制为打卡点。
+5. 在打卡点输入框中单独填写坐标（每行 纬度,经度），再点击“保存并启用手动点位”。
+   未补填打卡点时会提示错误，不会覆盖已保存的配置。
+6. 点击“使用服务器点位”可恢复原模式。
+
+路线说明
+- 定位锚点使用第一个定位点（转换为 GCJ-02），不改写设备信息中的锚点。
+- 道路模式保留定位点输入顺序，按真实路网规划；经典模式仍使用原有的环形排序算法。
+- 手动打卡点不会加入路线生成器；请自行让路线经过需要打卡的位置。
+- 学校策略必经点仍会在最终轨迹上校验；未经过会报错。
+- 离线路网缓存只包含路线信息，不将缓存路线点猜作打卡点。
+- 修改的是本地设置，不会新增学校后台官方点位，也不控制手机端的官方标记显示。
+
+验证
+- cargo test --workspace --locked：204 项通过，0 失败。
+- 包括点位隔离、打卡点移动不影响路线、真实经过判定、旧配置迁移、坐标转换、输入校验、学校隔离和界面保存。
+- 补丁已在干净的上游提交上验证可应用。
+- Windows x64 EXE 编译成功并检查导入依赖；未在真实 Windows 桌面启动验收，未使用用户账号提交记录。
+
+源码与构建
+原项目：https://github.com/YanamiNeko/NekoSportsWorldTool
+基于提交：e229abdbab71e377b86632e588e607413af4b93c
+source.zip：完整构建源码（含字体、路由模块、vendor）。
+dual-points.patch：相对于上述上游提交的完整修改（已包含旧手动点位补丁，无需先应用旧补丁）。
+build-windows.cmd：将 source.zip 解压在本目录后，可在已安装 Rust 和 MSVC C++ 工具链的 Windows 上执行。
+本包 EXE 构建环境：Rust 1.99.1、x86_64-pc-windows-gnu、MinGW GCC 13-posix。
+交叉构建命令：cargo --config 'profile.release.package.image.codegen-units=1' --config 'profile.release.package.nekosportsworldtool.codegen-units=1' build --locked --release --target x86_64-pc-windows-gnu -j 2
+同时为该目标指定 CC、AR 和 CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER 为对应的 MinGW 工具。
+两项 codegen-units 配置用于避开此次交叉编译器生成空目标文件的问题。
+详细测试和编译输出见 verification 目录。
+许可证：沿用原项目 CC BY-NC 4.0，见 LICENSE。
